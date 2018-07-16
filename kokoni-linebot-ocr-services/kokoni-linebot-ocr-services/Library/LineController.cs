@@ -12,7 +12,8 @@ namespace KokoniLinebotOCRServices.Library
 {
     public class LineController
     {
-        private static HttpClient client = new HttpClient();
+        static readonly string requestDomain = "http://localhost:8080/v2/bot/";
+        //static readonly string requestDomain = "https://api.line.me/v2/bot/";
 
         /// <summary>
         /// Lineからコンテンツを取得
@@ -24,12 +25,16 @@ namespace KokoniLinebotOCRServices.Library
 
             // 画像を取得するLine APIを実行
 
-            //　認証ヘッダーを追加
-            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {ConfigurationManager.AppSettings["ChannelAccessTokenOCR"]}");
+            using (var client = new HttpClient())
+            {
+                //　認証ヘッダーを追加
+                client.DefaultRequestHeaders.Remove("Authorization");
+                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {ConfigurationManager.AppSettings["ChannelAccessTokenOCR"]}");
 
-            // 非同期でPOST
-            var res = await client.GetAsync($"https://api.line.me/v2/bot/message/{messageId}/content");
-            responsestream = await res.Content.ReadAsStreamAsync();
+                // 非同期でPOST
+                var res = await client.GetAsync($"{requestDomain}message/{messageId}/content");
+                responsestream = await res.Content.ReadAsStreamAsync();
+            }
 
             return responsestream;
         }
@@ -44,15 +49,20 @@ namespace KokoniLinebotOCRServices.Library
             var reqData = JsonConvert.SerializeObject(content);
 
             // リクエストデータを作成
-            // ※HttpClientで[application/json]をHTTPヘッダに追加するときは下記のコーディングじゃないとエラーになる
-            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "https://api.line.me/v2/bot/message/reply");
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, $"{requestDomain}message/reply");
+//            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "https://api.line.me/v2/bot/message/reply");
             request.Content = new StringContent(reqData, Encoding.UTF8, "application/json");
 
-            //　認証ヘッダーを追加
-            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {ConfigurationManager.AppSettings["ChannelAccessTokenOCR"]}");
+            using (var client = new HttpClient())
+            {
 
-            // 非同期でPOST
-            var res = await client.SendAsync(request);
+                //　認証ヘッダーを追加
+                client.DefaultRequestHeaders.Remove("Authorization");
+                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {ConfigurationManager.AppSettings["ChannelAccessTokenOCR"]}");
+
+                // 非同期でPOST
+                var res = await client.SendAsync(request);
+            }
         }
 
         /// <summary>

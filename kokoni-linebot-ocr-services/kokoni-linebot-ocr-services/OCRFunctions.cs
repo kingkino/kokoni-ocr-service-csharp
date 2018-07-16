@@ -1,14 +1,14 @@
 ﻿
 using KokoniLinebotOCRServices.Library;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
+using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using System;
 using System.IO;
-using System.Net.Http;
+using System.Net;
 using System.Threading.Tasks;
 
 namespace KokoniLinebotOCRServices
@@ -18,9 +18,16 @@ namespace KokoniLinebotOCRServices
         [FunctionName("OCR_Functions")]
         public static async Task<String> RunAsync(
             [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)]HttpRequest req, 
-            TraceWriter log)
+            TraceWriter log , 
+            ExecutionContext context)
         {
             log.Info("Start");
+
+            var config = new ConfigurationBuilder()
+                             .SetBasePath(context.FunctionAppDirectory)
+                             .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
+                             .AddEnvironmentVariables()
+                             .Build();
 
             // リクエストJSONをパース
             var jsonContent = await req.ReadAsStringAsync();
@@ -57,34 +64,37 @@ namespace KokoniLinebotOCRServices
                 responsestream = await LineController.GetLineContents(messageId);
 
                 // ComputerVisionAPIにリクエストを送る
-                var OCRResponse = await OCRController.GetOCRData(responsestream,log);
+                var OCRResponse = await OCRController.GetOCRData(responsestream,config.GetSection("SubscriptionKey").Value,log);
 
                 // 文字列をパース
                 var words = await OCRController.GetParseString(OCRResponse, log);
 
                 // リプライデータの作成
                 content = LineController.CreateResponse(replyToken, words, log);
+
+                // Line ReplyAPIにリクエスト
+                await LineController.PutLineReply(content);
+
+                // ここは失敗してもいいのでtryしとく
+                try
+                {
+                    // Lineから指定MessageIdの画像を取得
+                    responsestream = await LineController.GetLineContents(messageId);
+                    // 取得した画像をAzure Storageに保存
+                    await AzureStorageController.PutLineContentsToStorageAsync(responsestream, containerName, fileName);
+                }
+                catch { }
             }
             else
             {
                 // リプライデータの作成
                 content = LineController.CreateResponse(replyToken, "現在は画像のみの対応となります。", log);
+
+                // Line ReplyAPIにリクエスト
+                await LineController.PutLineReply(content);
             }
 
-            // Line ReplyAPIにリクエスト
-            await LineController.PutLineReply(content);
-
-            // ここは失敗してもいいのでtryしとく
-            try
-            {
-                // Lineから指定MessageIdの画像を取得
-                responsestream = await LineController.GetLineContents(messageId);
-                // 取得した画像をAzure Storageに保存
-                await AzureStorageController.PutLineContentsToStorageAsync(responsestream, containerName, fileName);
-            }
-            catch { }
-
-            return req.HttpContext.Response.StatusCode.ToString();
+            return HttpStatusCode.OK.ToString();
         }
     }
 }

@@ -6,38 +6,43 @@ using System.Configuration;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace KokoniLinebotOCRServices.Library
 {
     public class OCRController
     {
-        private static HttpClient client = new HttpClient();
 
         /// <summary>
         /// 画像から文字を取得する
         /// </summary>
         /// <returns>Stream</returns>
-        public static async Task<HttpResponseMessage> GetOCRData(Stream stream, TraceWriter log)
+        public static async Task<HttpResponseMessage> GetOCRData(Stream stream, string SubscriptionKey, TraceWriter log)
         {
             var OCRResponse = new HttpResponseMessage();
+            var queryString = HttpUtility.ParseQueryString(string.Empty);
 
             // Computer vision APIのOCRにリクエスト
             // リクエストパラメータ作成
-            string language = "unk";
-            string detectOrientation = "true";
-            var uri = $"https://westus.api.cognitive.microsoft.com/vision/v1.0/ocr?language={language}&detectOrientation={detectOrientation}";
+            queryString["language"] = "unk";
+            queryString["detectOrientation"] = "true";
+            var uri = @"https://japaneast.api.cognitive.microsoft.com/vision/v1.0/ocr?" + queryString;
 
-            // ComputerVisionAPIへのリクエスト情報を作成
-            HttpRequestMessage OCRRequest = new HttpRequestMessage(HttpMethod.Post, uri);
-            OCRRequest.Content = new StreamContent(stream);
-            OCRRequest.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            // Computer vision APIのOCRにリクエスト
+            using (var getOCRDataClient = new HttpClient())
+            {
+                // ComputerVisionAPIへのリクエスト情報を作成
+                HttpRequestMessage OCRRequest = new HttpRequestMessage(HttpMethod.Post, uri);
+                OCRRequest.Content = new StreamContent(stream);
+                OCRRequest.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
 
-            // リクエストヘッダーの作成
-            client.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", $"{ConfigurationManager.AppSettings["SubscriptionKey"]}");
+                // リクエストヘッダーの作成
+                getOCRDataClient.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", $"{SubscriptionKey}");
 
-            // ComputerVisionAPIにリクエスト
-            OCRResponse = await client.SendAsync(OCRRequest);
+                OCRResponse = await getOCRDataClient.SendAsync(OCRRequest);
+            }
 
             return OCRResponse;
         }
