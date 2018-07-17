@@ -61,25 +61,43 @@ namespace KokoniLinebotOCRServices
             if (messageType == "image")
             {
                 // Lineから指定MessageIdの画像を再取得
-                responsestream = await LineController.GetLineContents(messageId);
+                responsestream = await LineAPIController.GetLineContents(messageId);
+
+#if DEBUG
+                responsestream = await LineAPIController.GetLineContents(
+                    messageId);
+#else
+                responsestream = await LineAPIController.GetLineContents(
+                    messageId, 
+                    config.GetSection("requestDomain").Value
+                    );
+#endif
 
                 // ComputerVisionAPIにリクエストを送る
-                var OCRResponse = await OCRController.GetOCRData(responsestream,config.GetSection("SubscriptionKey").Value,log);
+                var OCRResponse = await OCRAPIController.GetOCRData(
+                    responsestream,
+                    config.GetSection("SubscriptionKey").Value
+                    );
 
                 // 文字列をパース
-                var words = await OCRController.GetParseString(OCRResponse, log);
+                var words = await OCRAPIController.GetParseString(OCRResponse, log);
+
+                // 文字列を翻訳
+                var transword = await TranslateAPIController.GetTranslateWord(words, config.GetSection("TranslateAuthToken").Value, log);
+
+
 
                 // リプライデータの作成
-                content = LineController.CreateResponse(replyToken, words, log);
+                content = LineAPIController.CreateResponse(replyToken, transword, log);
 
                 // Line ReplyAPIにリクエスト
-                await LineController.PutLineReply(content);
+                await LineAPIController.PutLineReply(content);
 
                 // ここは失敗してもいいのでtryしとく
                 try
                 {
                     // Lineから指定MessageIdの画像を取得
-                    responsestream = await LineController.GetLineContents(messageId);
+                    responsestream = await LineAPIController.GetLineContents(messageId);
                     // 取得した画像をAzure Storageに保存
                     await AzureStorageController.PutLineContentsToStorageAsync(responsestream, containerName, fileName);
                 }
@@ -88,11 +106,13 @@ namespace KokoniLinebotOCRServices
             else
             {
                 // リプライデータの作成
-                content = LineController.CreateResponse(replyToken, "現在は画像のみの対応となります。", log);
+                content = LineAPIController.CreateResponse(replyToken, "Sorry! Picture Only!!", log);
 
                 // Line ReplyAPIにリクエスト
-                await LineController.PutLineReply(content);
+                await LineAPIController.PutLineReply(content);
             }
+
+            log.Info("END");
 
             return HttpStatusCode.OK.ToString();
         }

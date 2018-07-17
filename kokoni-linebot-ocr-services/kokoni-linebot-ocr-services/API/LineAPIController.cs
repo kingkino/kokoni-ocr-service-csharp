@@ -10,16 +10,13 @@ using System.Threading.Tasks;
 
 namespace KokoniLinebotOCRServices.Library
 {
-    public class LineController
+    public class LineAPIController
     {
-        static readonly string requestDomain = "http://localhost:8080/v2/bot/";
-        //static readonly string requestDomain = "https://api.line.me/v2/bot/";
-
         /// <summary>
         /// Lineからコンテンツを取得
         /// </summary>
         /// <returns>Stream</returns>
-        public static async Task<Stream> GetLineContents(string messageId)
+        public static async Task<Stream> GetLineContents(string messageId, string requestDomain = "http://localhost:8080/v2/bot/")
         {
             Stream responsestream = new MemoryStream();
 
@@ -43,14 +40,13 @@ namespace KokoniLinebotOCRServices.Library
         /// Lineににreplyを送信する
         /// </summary>
         /// <returns>Stream</returns>
-        public static async Task PutLineReply(Response content)
+        public static async Task PutLineReply(Response content, string requestDomain = "http://localhost:8080/v2/bot/")
         {
             // JSON形式に変換
             var reqData = JsonConvert.SerializeObject(content);
 
             // リクエストデータを作成
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, $"{requestDomain}message/reply");
-//            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "https://api.line.me/v2/bot/message/reply");
             request.Content = new StringContent(reqData, Encoding.UTF8, "application/json");
 
             using (var client = new HttpClient())

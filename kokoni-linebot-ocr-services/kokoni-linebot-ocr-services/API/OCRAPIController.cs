@@ -12,14 +12,14 @@ using System.Web;
 
 namespace KokoniLinebotOCRServices.Library
 {
-    public class OCRController
+    public class OCRAPIController
     {
 
         /// <summary>
         /// 画像から文字を取得する
         /// </summary>
         /// <returns>Stream</returns>
-        public static async Task<HttpResponseMessage> GetOCRData(Stream stream, string SubscriptionKey, TraceWriter log)
+        public static async Task<HttpResponseMessage> GetOCRData(Stream stream, string SubscriptionKey, string visionUri = "https://japaneast.api.cognitive.microsoft.com/vision/v1.0/ocr?")
         {
             var OCRResponse = new HttpResponseMessage();
             var queryString = HttpUtility.ParseQueryString(string.Empty);
@@ -28,7 +28,7 @@ namespace KokoniLinebotOCRServices.Library
             // リクエストパラメータ作成
             queryString["language"] = "unk";
             queryString["detectOrientation"] = "true";
-            var uri = @"https://japaneast.api.cognitive.microsoft.com/vision/v1.0/ocr?" + queryString;
+            var uri = visionUri + queryString;
 
             // Computer vision APIのOCRにリクエスト
             using (var getOCRDataClient = new HttpClient())
